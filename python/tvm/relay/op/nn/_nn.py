@@ -227,7 +227,7 @@ reg.register_pattern("nn.avg_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
 def schedule_global_max_pool2d(_, outs, target):
     """Schedule definition of global_max_pool2d"""
     with target:
-        return topi.generic.schedule_adaptive_pool(outs)
+        return topi.generic.schedule_global_pool(outs)
 
 reg.register_pattern("nn.global_max_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
 
@@ -237,30 +237,9 @@ reg.register_pattern("nn.global_max_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
 def schedule_global_avg_pool2d(_, outs, target):
     """Schedule definition of global_avg_pool2d"""
     with target:
-        return topi.generic.schedule_adaptive_pool(outs)
+        return topi.generic.schedule_global_pool(outs)
 
 reg.register_pattern("nn.global_avg_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
-
-
-# adaptive_max_pool2d
-@reg.register_schedule("nn.contrib_adaptive_max_pool2d")
-def schedule_contrib_adaptive_max_pool2d(_, outs, target):
-    """Schedule definition of adaptive_max_pool2d"""
-    with target:
-        return topi.generic.schedule_adaptive_pool(outs)
-
-reg.register_pattern("nn.contrib_adaptive_max_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
-
-
-# adaptive_avg_pool2d
-@reg.register_schedule("nn.contrib_adaptive_avg_pool2d")
-def schedule_contrib_adaptive_avg_pool2d(_, outs, target):
-    """Schedule definition of adaptive_avg_pool2d"""
-    with target:
-        return topi.generic.schedule_adaptive_pool(outs)
-
-reg.register_pattern("nn.contrib_adaptive_avg_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
-
 
 # leaky_relu
 reg.register_schedule("nn.leaky_relu", schedule_broadcast)
