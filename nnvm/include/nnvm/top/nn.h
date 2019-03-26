@@ -413,6 +413,39 @@ struct GlobalPool2DParam : public dmlc::Parameter<GlobalPool2DParam> {
   }
 };
 
+
+struct AdaptiveMaxPool2DParam : public dmlc::Parameter<AdaptiveMaxPool2DParam> {
+  TShape output_size;
+  std::string layout;
+
+  DMLC_DECLARE_PARAMETER(AdaptiveMaxPool2DParam) {
+    DMLC_DECLARE_FIELD(output_size)
+      .describe("Output height and width");
+    DMLC_DECLARE_FIELD(layout).set_default("NCHW")
+      .describe("Dimension ordering of data and weight. Can be 'NCHW', 'NHWC', etc."
+                "'N', 'C', 'H', 'W' stands for batch, channel, height, and width"
+                "dimensions respectively. Convolution is applied on the 'H' and"
+                "'W' dimensions.");
+  }
+};
+
+
+struct AdaptiveAvgPool2DParam : public dmlc::Parameter<AdaptiveAvgPool2DParam> {
+  TShape output_size;
+  std::string layout;
+
+  DMLC_DECLARE_PARAMETER(AdaptiveAvgPool2DParam) {
+    DMLC_DECLARE_FIELD(output_size)
+      .describe("Output height and width");
+    DMLC_DECLARE_FIELD(layout).set_default("NCHW")
+      .describe("Dimension ordering of data and weight. Can be 'NCHW', 'NHWC', etc."
+                "'N', 'C', 'H', 'W' stands for batch, channel, height, and width"
+                "dimensions respectively. Convolution is applied on the 'H' and"
+                "'W' dimensions.");
+  }
+};
+
+
 struct UpSamplingParam : public dmlc::Parameter<UpSamplingParam> {
   int scale;
   std::string layout;

@@ -20,6 +20,8 @@ set -e
 set -u
 
 export PYTHONPATH=nnvm/python:python:topi/python
+export PYTHONPATH=$PYTHONPATH:.local/lib/python3.6/site-packages
+
 # to avoid openblas threading error
 export OMP_NUM_THREADS=1
 
@@ -76,3 +78,6 @@ python3 -m nose -v tests/python/frontend/tensorflow
 
 echo "Running relay caffe2 frondend test..."
 python3 -m nose -v tests/python/frontend/caffe2
+
+echo "Running nnvm PyTorch frontend test..."
+python3 -m nose -v tests/python/frontend/pytorch

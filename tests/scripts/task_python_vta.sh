@@ -27,6 +27,11 @@ rm -rf ~/.tvm
 # Rebuild cython
 make cython3
 
+echo "Installing PyTorch dependencies for testing..."
+pip3 install torch --user
+pip3 install torchvision --user
+export PYTHONPATH=$PYTHONPATH:.local/lib/python3.6/site-packages
+
 echo "Running unittest..."
 python3 -m nose -v vta/tests/python/unittest
 
