@@ -28,10 +28,15 @@ rm -rf ~/.tvm
 make cython
 make cython3
 
+echo "Installing PyTorch dependencies for testing..."
+pip3 install torch --user
+pip3 install torchvision --user
+export PYTHONPATH=$PYTHONPATH:.local/lib/python3.6/site-packages
+
 echo "Running unittest..."
-python -m nose -v vta/tests/python/unittest
+#python -m nose -v vta/tests/python/unittest
 python3 -m nose -v vta/tests/python/unittest
 
 echo "Running integration test..."
-python -m nose -v vta/tests/python/integration
+#python -m nose -v vta/tests/python/integration
 python3 -m nose -v vta/tests/python/integration

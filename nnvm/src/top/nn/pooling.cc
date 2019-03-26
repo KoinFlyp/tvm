@@ -432,5 +432,182 @@ NNVM_REGISTER_OP(global_avg_pool2d)
 .set_num_inputs(1)
 .set_support_level(2);
 
+DMLC_REGISTER_PARAMETER(AdaptiveMaxPool2DParam);
+
+template <typename T>
+inline bool AdaptivePool2DInferShape(const nnvm::NodeAttrs& attrs,
+                                     std::vector<TShape>* in_shape,
+                                     std::vector<TShape>* out_shape) {
+  const T& param = nnvm::get<T>(attrs.parsed);
+  CHECK_EQ(in_shape->size(), 1U);
+  CHECK_EQ(out_shape->size(), 1U);
+
+  TShape dshape = (*in_shape)[0];
+  if (dshape.ndim() ==  0) return false;
+
+  CHECK_GE(dshape.ndim(), 2U)
+    << "AdaptivePool2D only support input >= 2-D: input must have height and width";
+
+  Layout layout(param.layout);
+  CHECK(layout.contains('H') && layout.contains('W') &&
+        !layout.contains('h') && !layout.contains('w'))
+    << "Invalid layout " << layout
+    << ". AdaptivePool2D layout must have H and W, which cannot be split";
+
+  const auto hidx = layout.indexof('H');
+  const auto widx = layout.indexof('W');
+
+  TShape oshape = dshape;
+  CHECK(param.out_height <= dshape[hidx])
+      << "output height (" << param.out_height << ") exceeds input ("
+      << dshape[hidx] << ")";
+  CHECK(param.out_width <= dshape[widx])
+      << "output width (" << param.out_width << ") exceeds input ("
+      << dshape[widx] << ")";
+
+  oshape[hidx] = param.out_height;
+  oshape[widx] = param.out_width;
+
+  NNVM_ASSIGN_OUTPUT_SHAPE(attrs, *out_shape, 0, oshape);
+  return true;
+}
+
+template <typename T>
+inline bool AdaptivePool2DCorrectLayout(const NodeAttrs& attrs,
+                                        std::vector<Layout> *ilayouts,
+                                        const std::vector<Layout> *last_ilayouts,
+                                        std::vector<Layout> *olayouts) {
+  const T &param = nnvm::get<T>(attrs.parsed);
+  CHECK_EQ(ilayouts->size(), 1);
+  CHECK_EQ(last_ilayouts->size(), 1);
+  CHECK_EQ(olayouts->size(), 1);
+
+  Layout input = (*ilayouts)[0];
+  const Layout layout(param.layout);
+
+  if (input.defined()) {
+    CHECK(input.convertible(layout)) << "Invalid input layout " << input;
+    if (input.indexof('W') != layout.indexof('W') ||
+        input.indexof('H') != layout.indexof('H') ||
+        input.contains('w') || input.contains('h')) {
+      // as long as the index doesn't change for width and height
+      // pool2d can keep the input layout.
+      input = layout;
+    }
+  } else {
+    input = layout;
+  }
+
+  NNVM_ASSIGN_LAYOUT(*ilayouts, 0, input);
+  NNVM_ASSIGN_LAYOUT(*olayouts, 0, input);
+
+  return true;
+}
+
+NNVM_REGISTER_OP(adaptive_max_pool2d)
+.describe(R"code(Adaptive max pooling operation for one dimensional data.
+
+- **data**: This depends on the `layout` parameter. Input is 4D array of shape
+            (batch_size, channels, height, width) if `layout` is `NCHW`.
+- **out**: This depends on the `layout` parameter. Output is 4D array of shape
+           (batch_size, channels, out_height, out_width)  if `layout` is `NCHW`.
+           out_height and out_width are calculated as::
+
+               out_height = floor((height+padding[0]+padding[2]-pool_size[0])/strides[0])+1
+               out_width = floor((width+padding[1]+padding[3]-pool_size[1])/strides[1])+1
+
+           where padding will be an expanded array based on number of values passed as::
+               one int : all sides same padding used.
+               two int : bottom, right use same as top and left.
+               four int: padding width in the order of (top, left, bottom, right).
+
+           When `ceil_mode` is `True`, ceil will be used instead of floor in this
+           equation.
+
+)code" NNVM_ADD_FILELINE)
+.add_argument("data", "4D Tensor", "Input data.")
+.add_arguments(AdaptiveMaxPool2DParam::__FIELDS__())
+.set_attr_parser(ParamParser<AdaptiveMaxPool2DParam>)
+.set_attr<FGetAttrDict>("FGetAttrDict", ParamGetAttrDict<AdaptiveMaxPool2DParam>)
+.set_num_outputs(1)
+.set_num_inputs(1)
+.set_attr<FInferShape>("FInferShape", AdaptivePool2DInferShape<AdaptiveMaxPool2DParam>)
+.set_attr<FInferType>("FInferType", ElemwiseType<1, 1>)
+.set_attr<FCorrectLayout>("FCorrectLayout", AdaptivePool2DCorrectLayout<AdaptiveMaxPool2DParam>)
+.set_attr<FTVMCompute>("FTVMCompute", [](const NodeAttrs& attrs,
+                                         const Array<Tensor>& inputs,
+                                         const Array<Tensor>& out_info) {
+  const AdaptiveMaxPool2DParam& param = nnvm::get<AdaptiveMaxPool2DParam>(attrs.parsed);
+
+
+  Layout layout(param.layout);
+  CHECK(layout.convertible(Layout("NCHW")))
+    << "max_pool2d currently only supports layouts that are convertible from NCHW";
+  CHECK_EQ(layout.indexof('h'), -1) << "max_pool2d does not support input split on height";
+  CHECK_EQ(layout.indexof('w'), -1) << "max_pool2d does not support input split on width";
+
+  CHECK(inputs[0].ndim() == 4U || inputs[0].ndim() == 5U)
+    << "Pool2D only support 4-D input (e.g., NCHW)"
+    << " or 5-D input (last dimension is a split of channel)";
+
+  return Array<Tensor>{
+    topi::nn::adaptive_pool(inputs[0], param.out_height, param.out_width,
+                            topi::nn::kMaxPool, layout.name())};
+})
+.set_support_level(2);
+
+DMLC_REGISTER_PARAMETER(AdaptiveAvgPool2DParam);
+
+NNVM_REGISTER_OP(adaptive_avg_pool2d)
+.describe(R"code(Adaptive average pooling operation for one dimensional data.
+
+- **data**: This depends on the `layout` parameter. Input is 4D array of shape
+            (batch_size, channels, height, width) if `layout` is `NCHW`.
+- **out**: This depends on the `layout` parameter. Output is 4D array of shape
+           (batch_size, channels, out_height, out_width)  if `layout` is `NCHW`.
+           out_height and out_width are calculated as::
+
+               out_height = floor((height+padding[0]+padding[2]-pool_size[0])/strides[0])+1
+               out_width = floor((width+padding[1]+padding[3]-pool_size[1])/strides[1])+1
+
+           where padding will be an expanded array based on number of values passed as::
+               one int : all sides same padding used.
+               two int : bottom, right use same as top and left.
+               four int: padding width in the order of (top, left, bottom, right).
+
+           When `ceil_mode` is `True`, ceil will be used instead of floor in this
+           equation.
+
+)code" NNVM_ADD_FILELINE)
+.add_argument("data", "4D Tensor", "Input data.")
+.add_arguments(AdaptiveAvgPool2DParam::__FIELDS__())
+.set_attr_parser(ParamParser<AdaptiveAvgPool2DParam>)
+.set_attr<FGetAttrDict>("FGetAttrDict", ParamGetAttrDict<AdaptiveAvgPool2DParam>)
+.set_attr<FInferShape>("FInferShape", AdaptivePool2DInferShape<AdaptiveAvgPool2DParam>)
+.set_attr<FInferType>("FInferType", ElemwiseType<1, 1>)
+.set_attr<FCorrectLayout>("FCorrectLayout", AdaptivePool2DCorrectLayout<AdaptiveAvgPool2DParam>)
+.set_attr<FTVMCompute>("FTVMCompute", [](const NodeAttrs& attrs,
+                                         const Array<Tensor>& inputs,
+                                         const Array<Tensor>& out_info) {
+  const AdaptiveAvgPool2DParam& param = nnvm::get<AdaptiveAvgPool2DParam>(attrs.parsed);
+
+  Layout layout(param.layout);
+  CHECK(layout.convertible(Layout("NCHW")))
+    << "avg_pool2d currently only supports layouts that are convertible from NCHW";
+  CHECK_EQ(layout.indexof('h'), -1) << "avg_pool2d does not support input split on height";
+  CHECK_EQ(layout.indexof('w'), -1) << "avg_pool2d does not support input split on width";
+
+  CHECK(inputs[0].ndim() == 4U || inputs[0].ndim() == 5U)
+    << "Pool2D only support 4-D input (e.g., NCHW)"
+    << " or 5-D input (last dimension is a split of channel)";
+
+  return Array<Tensor>{
+    topi::nn::adaptive_pool(inputs[0], param.out_height, param.out_width,
+                            topi::nn::kAvgPool, layout.name())};
+})
+.set_num_outputs(1)
+.set_num_inputs(1)
+.set_support_level(2);
+
 }  // namespace top
 }  // namespace nnvm
