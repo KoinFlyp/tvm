@@ -446,6 +446,27 @@ def schedule_global_avg_pool2d(_, outs, target):
 
 reg.register_pattern("global_avg_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
 
+
+# adaptive_max_pool2d
+@reg.register_schedule("adaptive_max_pool2d")
+def schedule_adaptive_max_pool2d(attrs, outs, target):
+    """Schedule definition of adaptive_max_pool2d"""
+    with tvm.target.create(target):
+        return topi.generic.schedule_adaptive_pool(outs)
+
+reg.register_pattern("adaptive_max_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
+
+
+# adaptive_avg_pool2d
+@reg.register_schedule("adaptive_avg_pool2d")
+def schedule_adaptive_avg_pool2d(attrs, outs, target):
+    """Schedule definition of adaptive_avg_pool2d"""
+    with tvm.target.create(target):
+        return topi.generic.schedule_adaptive_pool(outs)
+
+reg.register_pattern("adaptive_avg_pool2d", OpPattern.OUT_ELEMWISE_FUSABLE)
+
+
 # upsampling
 @reg.register_schedule("upsampling")
 def schedule_upsampling(_, outs, target):
