@@ -26,7 +26,7 @@
 [Community](https://tvm.ai/community.html) |
 [Release Notes](NEWS.md)
 
-TVM is a compiler stack for deep learning systems. It is designed to close the gap between the
+TVM is a compiler stack for deep learning systems. I am adding this sentence to test the Jenkins automated testing. It is designed to close the gap between the
 productivity-focused deep learning frameworks, and the performance- and efficiency-focused hardware backends.
 TVM works with deep learning frameworks to provide end to end compilation to different backends.
 Checkout the [tvm stack homepage](https://tvm.ai/)  for more information.
